@@ -12,8 +12,8 @@
 #include <wintrust.h>
 #include <Softpub.h>
 
-#include <cpprest/json.h>
-using namespace web;
+#include "rapidjson/document.h"
+#include "rapidjson/istreamwrapper.h"
 
 using comhost::clsid_map_entry;
 using comhost::clsid_map;
@@ -48,26 +48,22 @@ namespace
         skip_utf8_bom(&json_map_raw);
 
         // Parse JSON
-        json::value json_map;
-        try
-        {
-            json_map = json::value::parse(json_map_raw);
-        }
-        catch (const json::json_exception&)
+        rapidjson::Document json_map;
+        rapidjson::IStreamWrapper istream_wrapper{json_map_raw};
+        json_map.ParseStream(istream_wrapper);
+        if (json_map.HasParseError() || !json_map.IsObject())
         {
             trace::error(_X("Embedded .clsidmap format is invalid"));
             throw HResultException{ StatusCode::InvalidConfigFile };
         }
 
-        json::object &json_obj = json_map.as_object();
-
         // Process JSON and construct a map
         HRESULT hr;
         clsid_map mapping;
-        for (std::pair<utility::string_t, json::value> &prop : json_obj)
+        for (auto &prop : json_map.GetObject())
         {
             CLSID clsidMaybe;
-            hr = string_to_clsid(prop.first, clsidMaybe);
+            hr = string_to_clsid(prop.name.GetString(), clsidMaybe);
             if (FAILED(hr))
             {
                 assert(false && "Invalid CLSID");
@@ -77,9 +73,9 @@ namespace
 
             clsid_map_entry e{};
 
-            json::object &val = prop.second.as_object();
-            e.assembly = val.at(_X("assembly")).as_string();
-            e.type = val.at(_X("type")).as_string();
+            auto &val = prop.value.GetObject();
+            e.assembly = val[_X("assembly")].GetString();
+            e.type = val[_X("type")].GetString();
 
             mapping[clsidMaybe] = std::move(e);
         }
