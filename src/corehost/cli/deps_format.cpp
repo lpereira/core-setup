@@ -480,7 +480,9 @@ bool deps_json_t::load(bool is_framework_dependent, const pal::string_t& deps_pa
 
     try
     {
+        trace::timestamp(_X("corehost deps_format-load-parse-start"));
         const auto json = json_value::parse(file);
+        trace::timestamp(_X("corehost deps_format-load-parse-end"));
 
         const auto& runtime_target = json.at(_X("runtimeTarget"));
 
@@ -490,7 +492,10 @@ bool deps_json_t::load(bool is_framework_dependent, const pal::string_t& deps_pa
 
         trace::verbose(_X("Loading deps file... %s as framework dependent=[%d]"), deps_path.c_str(), is_framework_dependent);
 
-        return (is_framework_dependent) ? load_framework_dependent(deps_path, json, name, rid_fallback_graph) : load_self_contained(deps_path, json, name);
+        trace::timestamp(_X("corehost deps_format load-start"));
+        bool loaded = (is_framework_dependent) ? load_framework_dependent(deps_path, json, name, rid_fallback_graph) : load_self_contained(deps_path, json, name);
+        trace::timestamp(_X("corehost deps_format load-end"));
+        return loaded;
     }
     catch (const std::exception& je)
     {
